@@ -4,8 +4,10 @@ import path from 'node:path';
 import _ from '@env-spec/utils/my-dash';
 import { tryCatch } from '@env-spec/utils/try-catch';
 import {
+  ParsedEnvSpecArrayLiteral,
   ParsedEnvSpecDecorator, ParsedEnvSpecDecoratorComment, ParsedEnvSpecFile,
-  ParsedEnvSpecFunctionCall, ParsedEnvSpecStaticValue, parseEnvSpecDotEnvFile,
+  ParsedEnvSpecFunctionCall, ParsedEnvSpecKeyValuePair, ParsedEnvSpecStaticValue,
+  parseEnvSpecDotEnvFile,
 } from '@env-spec/parser';
 
 import { ConfigItem, type ConfigItemDef } from './config-item';
@@ -32,6 +34,66 @@ export function keyPassesImportFilter(
 ): boolean {
   if (importKeys?.length && !importKeys.includes(key)) return false;
   return keyMatchesFilter(key, importFilter);
+}
+
+/**
+ * Peek unprocessed `@import(...)` decorators on `source` to see if any would statically
+ * bring in `key`. Used during finishInit so `@currentEnv=$FLAG` can reference a flag that
+ * arrives via import (imports are processed later).
+ */
+export function importStaticallyProvidesKey(source: EnvGraphDataSource, key: string): boolean {
+  for (const importDec of source.getRootDecFns('import')) {
+    const args = importDec.parsedDecorator.bareFnArgs;
+    if (!args) continue;
+
+    let enabled: boolean | 'dynamic' = true;
+    let pickPatterns: Array<string> | undefined;
+    let omitPatterns: Array<string> | undefined;
+    const positionalKeys: Array<string> = [];
+    let sawPath = false;
+
+    for (const arg of args.values) {
+      if (arg instanceof ParsedEnvSpecKeyValuePair) {
+        if (arg.key === 'enabled') {
+          if (arg.value instanceof ParsedEnvSpecStaticValue) {
+            enabled = arg.value.value === true;
+          } else {
+            enabled = 'dynamic';
+          }
+        } else if (arg.key === 'pick' && arg.value instanceof ParsedEnvSpecArrayLiteral) {
+          pickPatterns = arg.value.simplifiedValue.filter((v): v is string => typeof v === 'string' && !!v.trim());
+        } else if (arg.key === 'omit' && arg.value instanceof ParsedEnvSpecArrayLiteral) {
+          omitPatterns = arg.value.simplifiedValue.filter((v): v is string => typeof v === 'string' && !!v.trim());
+        }
+      } else if (arg instanceof ParsedEnvSpecStaticValue) {
+        // first positional arg is the import path; later ones are deprecated key allowlist
+        if (!sawPath) {
+          sawPath = true;
+        } else if (typeof arg.value === 'string' && arg.value.trim()) {
+          positionalKeys.push(arg.value.trim());
+        }
+      }
+    }
+
+    // static enabled=false: this import will not run
+    if (enabled === false) continue;
+
+    if (pickPatterns?.length) {
+      if (keyMatchesFilter(key, { mode: 'pick', patterns: pickPatterns })) return true;
+      continue;
+    }
+    if (omitPatterns?.length) {
+      if (keyMatchesFilter(key, { mode: 'omit', patterns: omitPatterns })) return true;
+      continue;
+    }
+    if (positionalKeys.length) {
+      if (positionalKeys.includes(key)) return true;
+      continue;
+    }
+    // full import (no pick/omit/positional filter) brings every key
+    return true;
+  }
+  return false;
 }
 
 const DATA_SOURCE_TYPES = Object.freeze({
@@ -316,6 +378,14 @@ export abstract class EnvGraphDataSource {
           // For files, @currentEnv won't take effect and forEnv will fall back to parent's env setting
           if (this.isPartialImport && !this.isKeyImported(envFlagItemKey)) {
             skipCurrentEnvProcessing = true;
+          } else if (
+            // Flag arrives via @import later — do not process ref() yet (it would SchemaError
+            // "invalid dependency" and mark this source invalid, which skips _processImports).
+            !this.configItemDefs[envFlagItemKey]
+            && !isBuiltinVar(envFlagItemKey)
+            && importStaticallyProvidesKey(this, envFlagItemKey)
+          ) {
+            skipCurrentEnvProcessing = true;
           }
         }
       }
@@ -341,8 +411,14 @@ export abstract class EnvGraphDataSource {
     }
 
     if (envFlagItemKey) {
-      if (!this.configItemDefs[envFlagItemKey] && !isBuiltinVar(envFlagItemKey)) {
-        this._errors.push(new LoadingError(`environment flag "${envFlagItemKey}" must be defined within this schema`));
+      const definedLocally = !!this.configItemDefs[envFlagItemKey] || isBuiltinVar(envFlagItemKey);
+      // Flag may arrive later via @import — allow that without erroring/early-returning
+      // (early return used to skip @defaultSensitive processing and cascade into a crash).
+      const providedByImport = !definedLocally && importStaticallyProvidesKey(this, envFlagItemKey);
+      if (!definedLocally && !providedByImport) {
+        this._errors.push(new LoadingError(
+          `environment flag "${envFlagItemKey}" must be defined within this schema or imported via @import`,
+        ));
         return;
       }
 
@@ -352,7 +428,7 @@ export abstract class EnvGraphDataSource {
       }
 
       // Always set the envFlagKey so parent directories can check it
-      // (even if we're skipping processing for a file partial import)
+      // (even if we're skipping processing for a file partial import, or waiting on @import)
       this.setEnvFlag(envFlagItemKey);
     }
 
@@ -951,6 +1027,10 @@ export class DirectoryDataSource extends EnvGraphDataSource {
         if (!envFlagItem.resolvedValue) await envFlagItem.earlyResolve();
         return envFlagItem.resolvedValue?.toString();
       }
+      // Schema declared @currentEnv=$FLAG but FLAG is not in the graph yet (still waiting on
+      // @import). Return pending — do NOT fall back to parent/CLI env, or we would load the
+      // wrong .env.* files and skip the post-import resolve pass.
+      return undefined;
     }
     // Fall back to parent chain or fallback value
     return (await this.resolveCurrentEnv())?.toString() || this.envFlagValue?.toString();
@@ -996,7 +1076,8 @@ export class DirectoryDataSource extends EnvGraphDataSource {
       await child._processImports();
     }
 
-    // An import may have set @currentEnv (e.g. an imported file with @currentEnv=$VAR).
+    // An import may have set @currentEnv (e.g. an imported file with @currentEnv=$VAR),
+    // or provided the flag key referenced by this schema's @currentEnv=$FLAG (#428).
     // If we didn't load env-specific files above, check again now and process their imports too.
     if (!currentEnv) {
       currentEnv = await this._resolveCurrentEnv();
@@ -1005,6 +1086,14 @@ export class DirectoryDataSource extends EnvGraphDataSource {
         const envSources = await this._loadEnvSpecificFiles(currentEnv);
         for (const source of envSources) {
           await source._processImports();
+        }
+      } else if (this.schemaDataSource?._envFlagKey) {
+        const envFlagKey = this.schemaDataSource._envFlagKey;
+        if (!this.graph.configSchema[envFlagKey]) {
+          this._errors.push(new LoadingError(
+            `environment flag "${envFlagKey}" was expected from @import but was not provided. `
+            + 'Include it in pick=[...] (or omit filters), or define it in this schema.',
+          ));
         }
       }
     }
