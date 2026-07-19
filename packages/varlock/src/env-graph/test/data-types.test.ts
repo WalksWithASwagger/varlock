@@ -44,6 +44,15 @@ describe('url data type', () => {
       expect(g.configSchema.MY_URL.isValid).toBe(true);
       expect(g.configSchema.MY_URL.resolvedValue).toBe('https://example.com');
     });
+
+    it('does not prepend when http:// already present', async () => {
+      const g = await loadAndResolve(outdent`
+        # @type=url(prependHttps=true)
+        MY_URL=http://example.com
+      `);
+      expect(g.configSchema.MY_URL.isValid).toBe(true);
+      expect(g.configSchema.MY_URL.resolvedValue).toBe('http://example.com');
+    });
   });
 
   describe('noTrailingSlash', () => {

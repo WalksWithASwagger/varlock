@@ -343,7 +343,11 @@ const UrlDataType = createEnvGraphDataType(
     icon: 'carbon:url',
     coerce(rawVal) {
       const val = coerceToString(rawVal);
-      if (settings?.prependHttps && !val.startsWith('https://')) return `https://${val}`;
+      // Docs: prepend only when no protocol is specified. Checking just https://
+      // would turn http://example.com into https://http://example.com.
+      if (settings?.prependHttps && !/^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(val)) {
+        return `https://${val}`;
+      }
       return val;
     },
     validate(val) {
