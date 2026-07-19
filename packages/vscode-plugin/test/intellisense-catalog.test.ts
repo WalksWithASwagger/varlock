@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+import { resolveHoverContent } from '../src/hover-core';
 import {
   BUILTIN_VAR_KEYS,
   DECORATORS_BY_NAME,
   ITEM_DECORATORS,
   RESOLVERS,
+  RESOLVERS_BY_NAME,
   ROOT_DECORATORS,
 } from '../src/intellisense-catalog';
 
@@ -143,5 +145,15 @@ describe('intellisense-catalog parity with runtime built-ins', () => {
     expect(generateTs.documentation).toMatch(/executeWhenImported/);
     expect(generateTs.insertText).toMatch(/auto/);
     expect(generateTs.insertText).toMatch(/executeWhenImported/);
+  });
+
+  it('resolves hover content for decorators and resolvers', () => {
+    expect(resolveHoverContent('@internal')?.kind).toBe('decorator');
+    expect(resolveHoverContent('@internal')?.summary).toMatch(/internal/i);
+    expect(resolveHoverContent('ifs')?.kind).toBe('resolver');
+    expect(resolveHoverContent('ifs')?.name).toBe('ifs');
+    expect(RESOLVERS_BY_NAME.ifs).toBeDefined();
+    expect(resolveHoverContent('@notAThing')).toBeUndefined();
+    expect(resolveHoverContent('nope')).toBeUndefined();
   });
 });

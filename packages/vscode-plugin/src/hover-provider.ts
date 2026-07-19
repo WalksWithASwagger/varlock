@@ -1,41 +1,34 @@
 /*
-  Super basic "hover provider" functionality to give some hover help
-
-  for now we'll just give info about known decorators
+  Hover help for known decorators and built-in resolver functions.
 */
 import {
   type ExtensionContext, Hover, languages, MarkdownString,
 } from 'vscode';
 import { LANG_ID } from './constants';
+import { resolveHoverContent } from './hover-core';
 import { deindent } from './utils/deindent';
-import { DECORATORS_BY_NAME } from './intellisense-catalog';
 
 export function addHoverProvider(_context: ExtensionContext) {
   languages.registerHoverProvider(LANG_ID, {
     provideHover(document, position, _token) {
-      const hoveredLine = document.lineAt(position.line);
-      const lineStr = hoveredLine.text;
+      const wordAtPos = document.getWordRangeAtPosition(position, /@?[A-Za-z][\w]*/);
+      if (!wordAtPos) return undefined;
 
-      // we are in a comment
-      if (lineStr.trim().startsWith('#')) {
-        const wordAtPos = document.getWordRangeAtPosition(position, /@?[a-z0-9]+/i);
-        const hoveredText = document.getText(wordAtPos);
+      const hoveredText = document.getText(wordAtPos);
+      const content = resolveHoverContent(hoveredText);
+      if (!content) return undefined;
 
-        if (hoveredText.startsWith('@')) {
-          const decName = hoveredText.substring(1);
-          const dec = DECORATORS_BY_NAME[decName];
-          if (dec) {
-            const mds = new MarkdownString();
-            mds.supportThemeIcons = true;
-            mds.appendMarkdown(deindent(`
-              ${dec.summary}
+      const kindLabel = content.kind === 'decorator' ? 'Decorator' : 'Resolver function';
+      const mds = new MarkdownString();
+      mds.supportThemeIcons = true;
+      mds.appendMarkdown(deindent(`
+        **${kindLabel}** \`${content.kind === 'decorator' ? `@${content.name}` : `${content.name}()`}\`
 
-              ${dec.documentation}
-            `));
-            return new Hover(mds);
-          }
-        }
-      }
+        ${content.summary}
+
+        ${content.documentation}
+      `));
+      return new Hover(mds, wordAtPos);
     },
   });
 }

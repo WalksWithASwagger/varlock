@@ -536,3 +536,7 @@ export const BUILTIN_VAR_KEYS = [
 export const DECORATORS_BY_NAME = Object.fromEntries(
   [...ROOT_DECORATORS, ...ITEM_DECORATORS].map((decorator) => [decorator.name, decorator]),
 ) as Record<string, DecoratorInfo>;
+
+export const RESOLVERS_BY_NAME = Object.fromEntries(
+  RESOLVERS.map((resolver) => [resolver.name, resolver]),
+) as Record<string, ResolverInfo>;
