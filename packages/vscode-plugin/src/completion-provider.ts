@@ -21,6 +21,7 @@ import {
 } from './completion-core';
 import { LANG_ID } from './constants';
 import {
+  BUILTIN_VAR_KEYS,
   DATA_TYPES,
   ITEM_DECORATORS,
   type DecoratorInfo,
@@ -101,7 +102,7 @@ function createResolverItem(info: ResolverInfo, context: MatchContext) {
 }
 
 function createReferenceItems(document: TextDocument, context: MatchContext) {
-  const keys = new Set<string>(['VARLOCK_ENV']);
+  const keys = new Set<string>(BUILTIN_VAR_KEYS);
   for (let i = 0; i < document.lineCount; i += 1) {
     const match = document.lineAt(i).text.match(ENV_KEY_PATTERN);
     if (match) keys.add(match[1]);
