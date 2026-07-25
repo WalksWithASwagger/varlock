@@ -1,76 +1,232 @@
-# Project conventions
+# Agent Operating Guide
 
-## Repo structure
+This file defines how coding agents should work in this repository.
 
-This is a monorepo managed with bun workspaces and Turborepo:
+## Engineering Loop
 
-- `packages/env-spec-parser` — parser for the @env-spec language (PEG.js grammar in `grammar.peggy`)
-- `packages/varlock` — the main package: CLI + library for loading/validating `.env` files
-- `packages/varlock-website` — docs site (Astro); docs content lives in `src/content/docs/`
-- `packages/vscode-plugin` — VSCode extension for @env-spec language support
-- `packages/integrations/*` — framework integrations (nextjs, vite, astro, ...)
-- `packages/utils`, `packages/plugins` — shared internals
-- `packages/varlock-docs-mcp` — docs MCP server for external varlock users; do **not** use it to look things up while working on this repo — read the docs source directly
+Follow this loop:
 
-## Package manager
+Audit → Prioritize → Plan → Implement → Verify → Report
 
-- This repo uses **Bun** as the package manager (`bun install`, `bun run`, etc.)
-- Workspace deps use `workspace:*` protocol
-- Use catalog for any potentially common dependencies
-- CI workflows use `bun run` to execute scripts and `bunx` for one-off commands
+Do not skip directly from a vague request to implementation.
 
-## Scripts
+## Core Principles
 
-- Write any scripts which may end up being saved in **TypeScript** (`.ts`), not JavaScript
-  - throwaway/one-off code is fine in JS
-- Execute scripts using **`bun run`**, not `node`
-  - e.g. `bun run scripts/release-preview.ts`
-  - Bun runs `.ts` files natively — no compile step needed
-- Scripts in `scripts/` at the repo root are monorepo-level utilities, while specific packages may have their own `scripts` folder
+* Evidence over guesses
+* Simplicity over ceremony
+* Small changes over heroic rewrites
+* Existing primitives over new abstractions
+* Tests and evals over confidence theater
+* Preservation before cleanup
+* Clear ownership and handoffs
+* Documentation must describe reality
 
-## Binary builds
+## Repository Entry
 
-- The varlock CLI binary is built using `bun build --compile` (not Node SEA or pkg)
-- `bun run --filter varlock build:binary` builds a local dev binary for the current platform at `packages/varlock/dist-sea/varlock`
-- `packages/varlock/scripts/build-binaries.ts` builds cross-platform release binaries (or use `--current-platform` for a single local binary)
-- `bun run --filter varlock test:binary:local` builds the local binary and runs a smoke `load` check (WSL-aware helper copy)
-- `bun run --filter varlock pack:local` builds + packs a local tarball and prints a ready-to-paste `file:` dependency
+When beginning work:
 
-## Testing
+* Inspect the current branch
+* Inspect the working tree
+* Check the upstream relationship
+* Identify uncommitted and untracked work
+* Review relevant issues and PRs
+* Locate project entry points
+* Locate tests, evals, CI, and documentation
+* Identify the relevant source of truth
 
-- Unit/integration tests use **Vitest**
-- Smoke tests live in `smoke-tests/` and test the CLI end-to-end
-- Binary-specific tests in `smoke-tests/tests/binary.test.ts` require the SEA binary to be built first
+Do not modify files during initial orientation unless the task is trivial and explicitly authorized.
 
-## Versioning & releases
+## Planning
 
-- This monorepo uses **bumpy** (`@varlock/bumpy`) for version management
-- Changeset files live in `.bumpy/` and are created with `bunx @varlock/bumpy add` (or `bun run bumpy:add`)
-- Standard bump types: `major`, `minor`, `patch`
-- Non-interactive changeset creation (for CI/AI): `bumpy add --packages "pkg:minor" --message "description" --name "changeset-name"`
-- Bump files are only required when publishable packages have changed (based on `changedFilePatterns` in `.bumpy/_config.json`). Changes to CI workflows, root config files, scripts, docs, etc. do **not** require a bump file — bumpy's pre-push hook will not block in that case.
-- Write changeset descriptions for end users, and keep them short
+Before non-trivial implementation, create a focused work packet containing:
 
-## Branches & pull requests
+* Goal
+* Why it matters
+* Evidence
+* Scope
+* Non-goals
+* Likely files
+* Proposed approach
+* Behavior to preserve
+* Tests and evals
+* Risks
+* Validation commands
+* Definition of done
 
-- Branch names must be meaningful — a short kebab-case description of the change (e.g. `fix-cf-fifo-secret-concat`, `vite-plugin-hmr`). Never push an auto-generated session/worktree branch name (e.g. `claude/dreamy-jones-a79c22`); rename it first with `git branch -m <meaningful-name>`
-- Do **not** add AI attribution to PRs or commits — no "Authored by Claude" / "Generated with Claude Code" lines in PR descriptions, and no `Co-Authored-By: Claude` commit trailers
-- Keep PR descriptions concise: what changed and why. Don't mention linting passing or bump files being added — those are enforced by hooks and expected, not news
-- When pushing new commits to an open PR, update the PR description if the changes alter what it says
-- If a change affects user-facing behavior, update the docs in `packages/varlock-website/src/content/docs/` (guides and/or reference) in the same PR
+Ask for approval before implementation when the work is risky, broad, ambiguous, destructive, or architecture-changing.
+
+## Implementation
+
+* Make the smallest useful change.
+* Keep the diff focused.
+* Do not fix unrelated issues.
+* Do not silently expand scope.
+* Preserve public behavior unless change is explicitly required.
+* Add tests for important behavior.
+* Add regression tests for bugs.
+* Add evals when AI or agent behavior changes.
+* Update docs when user or developer behavior changes.
+
+## Git And Worktree Safety
+
+Do not perform destructive Git operations without explicit approval.
+
+Never assume a branch, worktree, stash, or untracked file is disposable.
+
+Before deleting or consolidating work:
+
+* Inventory it
+* Determine its purpose
+* Compare it with `main`
+* Identify duplicate or superseding work
+* Preserve anything uncertain
+* Verify tests and CI
+* Require human approval
+
+## Issue And PR Discipline
+
+* Reuse existing issues when possible.
+* Do not create duplicate issues.
+* One focused issue should usually map to one focused PR.
+* Split broad or unrelated work.
+* Use research or decision issues when requirements are unresolved.
+* Do not open a PR until implementation and validation are complete.
+
+Every implementation issue should contain:
+
+* Summary
+* Why it matters
+* Scope
+* Non-goals
+* Acceptance criteria
+* Tests
+* Evals, when relevant
+* Dependencies
+* Risks
+* Definition of done
+
+## Code Quality
+
+Look for:
+
+* Duplicate logic
+* Dead code
+* Unused imports and dependencies
+* Debug output
+* Temporary files
+* Commented-out code
+* Stale feature flags
+* Misleading names
+* Oversized modules
+* Fragile scripts
+* Unnecessary abstraction layers
+
+Do not declare code dead based only on appearance.
+
+Check imports, dynamic registration, configuration, tests, builds, scripts, and runtime entry points first.
+
+Refactoring must unlock something concrete.
+
+## Skills, Workflows, And Automations
+
+Use this model:
+
+* Skills define reusable capabilities.
+* Workflows coordinate skills.
+* Automations trigger workflows.
+* Issues define approved work.
+* PRs deliver focused implementation.
+
+Every active skill, workflow, or automation should have:
+
+* A clear purpose
+* A clear trigger
+* Clear inputs
+* Clear outputs
+* A clear owner
+* A safety boundary
+* A validation method
+* A known consumer
+
+Anything lacking these should be fixed, merged, paused, archived, replaced, or removed after approval.
+
+## Configuration And Secrets
+
+When Varlock is present:
+
+* Treat its schema as the configuration contract.
+* Prefer Varlock-based runtime and validation paths.
+* Identify legacy configuration paths that bypass it.
+* Never reveal resolved secrets.
+* Never commit secret-bearing files.
+* Report suspected leaks without reproducing values.
 
 ## Documentation
 
-Docs content lives in `packages/varlock-website/src/content/docs/` (`.mdx`). When writing or editing docs prose, keep the tone plain and direct, like an engineer wrote it:
+Documentation is part of the implementation.
 
-- No em dashes (`—`). Rewrite into separate sentences, commas, colons, or parentheses instead. Do not swap in a spaced hyphen (` - `). (En dashes for genuine numeric ranges like `15.0–15.4` are fine.)
-- Avoid marketing and AI-flavored filler: `seamless`, `comprehensive`, `powerful`, `robust`, `leverage`, `out of the box`, `by design`, `effortless`, `unlock` (metaphorical), "whether you need X, Y, or Z", "instead of wrestling with", and similar. Say what the thing does plainly.
-- Be concise, but never at the cost of completeness. Keep every flag, command, caveat, and link a user or their agent needs to stay unblocked.
-- Never edit code fences, `ansi`/`diff` blocks, generated fixtures, frontmatter structure, or MDX component markup for tone. Prose only.
-- Run `bun run --filter varlock-website astro build` to confirm the docs still build after non-trivial edits.
+Keep accurate:
 
-## Linting
+* README files
+* Setup instructions
+* Architecture docs
+* Changelogs
+* Configuration docs
+* Skill and workflow docs
+* Automation docs
+* Testing and eval instructions
 
-- Run **`bun run lint:fix`** from the repo root after completing a significant chunk of work (new feature, refactor, bug fix, etc.)
-- The linter uses ESLint with `@stylistic` and other plugins — auto-fix handles most formatting issues
-- Do not leave lint errors unresolved; fix any that `--fix` cannot handle automatically
+Do not invent changelog history.
+
+## Verification
+
+Run relevant checks after changes.
+
+Report:
+
+* Commands run
+* Results
+* Commands not run
+* Reason they were not run
+* Remaining uncertainty
+
+A task is not complete merely because code was written.
+
+## End Of Session
+
+Leave the repository easier to resume.
+
+Report:
+
+* Current branch and working state
+* Work completed
+* Files changed
+* Validation results
+* Remaining risks
+* Follow-up work
+* Exact recommended next step
+
+
+## Secrets (Varlock)
+
+- Local secrets for agent/tool use live in gitignored plaintext `.env` / `.env.local` (mode `0600`). Varlock owns `.env.schema` + `load`/`run` injection — not macOS Keychain or Touch ID.
+- Agents inspect with `varlock load --agent` and run tools with `varlock run --inject vars -- <command>`.
+- Never `cat` `.env` / `.env.local`, never `printenv` secrets, never `varlock reveal` in agent sessions.
+- Canonical contract docs: `/Users/kk/Code/kk-kb/docs/AGENT-SECRETS-VARLOCK.md`.
+
+---
+
+## This repository (varlock)
+
+Bun + Turborepo monorepo for the Varlock env toolchain.
+
+- Package manager: **Bun** (`bun install`, `bun run`, `bunx`). Workspace deps use `workspace:*`.
+- Layout: `packages/varlock` (CLI/library), `packages/env-spec-parser`, `packages/varlock-website` (Astro docs in `src/content/docs/`), `packages/integrations/*`, `packages/vscode-plugin`.
+- Scripts: prefer TypeScript; run with `bun run`. Binary builds use `bun build --compile`.
+- Tests: Vitest + `smoke-tests/`. Local binary smoke: `bun run --filter varlock test:binary:local`.
+- Versioning: **bumpy** (`.bumpy/`). Changesets only when publishable packages change. User-facing descriptions, short.
+- Branches: meaningful kebab-case names. Never push auto-generated session/worktree names without renaming first.
+- No AI attribution in commits/PRs (`Co-Authored-By: Claude`, "Generated with…", etc.).
+- Docs tone: plain engineer voice. No em dashes. No marketing/AI filler. Prose-only tone edits in MDX.
+- After substantial work: `bun run lint:fix`. Docs edits: `bun run --filter varlock-website astro build` when non-trivial.
+- Do not use `packages/varlock-docs-mcp` to look things up while working here — read docs source directly.
