@@ -65,6 +65,34 @@ describe('url data type', () => {
     });
   });
 
+  describe('allowedDomains', () => {
+    it('accepts a host listed in a comma-string allowlist', async () => {
+      const g = await loadAndResolve(outdent`
+        # @type=url(allowedDomains="example.com,api.example.com")
+        MY_URL=https://api.example.com/v1
+      `);
+      expect(g.configSchema.MY_URL.isValid).toBe(true);
+    });
+
+    it('rejects a host that is only a substring of an allowlist entry', async () => {
+      const g = await loadAndResolve(outdent`
+        # @type=url(allowedDomains="example.com")
+        MY_URL=https://ample.com/
+      `);
+      expect(g.configSchema.MY_URL.isValid).toBe(false);
+      expect(g.configSchema.MY_URL.errors[0]?.message).toMatch(/not in allowed list/);
+    });
+
+    it('rejects a disallowed host without throwing on the error message', async () => {
+      const g = await loadAndResolve(outdent`
+        # @type=url(allowedDomains="example.com")
+        MY_URL=https://evil.com/
+      `);
+      expect(g.configSchema.MY_URL.isValid).toBe(false);
+      expect(g.configSchema.MY_URL.errors[0]?.message).toContain('example.com');
+    });
+  });
+
   describe('noTrailingSlash', () => {
     it('accepts url without trailing slash', async () => {
       const g = await loadAndResolve(outdent`

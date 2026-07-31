@@ -404,10 +404,18 @@ const UrlDataType = createEnvGraphDataType(
         throw new ValidationError('Invalid URL');
       }
       const errors = [] as Array<ValidationError>;
-      if (
-        settings?.allowedDomains && !settings.allowedDomains.includes(url.host.toLowerCase())
-      ) {
-        errors.push(new ValidationError(`Domain (${url.host}) is not in allowed list: ${settings.allowedDomains.join(',')}`));
+      // allowedDomains may arrive as a comma-string (`"a.com,b.com"`) from schema
+      // syntax, or as a real array. Normalize before membership checks — string
+      // `.includes` is substring match and would allow e.g. "ample.com" for "example.com",
+      // and `.join` on a string throws when building the rejection message.
+      const allowedDomains = (() => {
+        const raw = settings?.allowedDomains as Array<string> | string | undefined;
+        if (!raw) return [] as Array<string>;
+        const list = Array.isArray(raw) ? raw : String(raw).split(',');
+        return list.map((d) => d.trim().toLowerCase()).filter(Boolean);
+      })();
+      if (allowedDomains.length && !allowedDomains.includes(url.host.toLowerCase())) {
+        errors.push(new ValidationError(`Domain (${url.host}) is not in allowed list: ${allowedDomains.join(',')}`));
       }
       if (settings?.noTrailingSlash && val.endsWith('/')) {
         errors.push(new ValidationError('URL must not have a trailing slash'));
