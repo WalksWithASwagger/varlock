@@ -468,8 +468,21 @@ const EnumDataType = createEnvGraphDataType(
     icon: 'material-symbols-light:category', // a few shapes... not sure about this one
     coercedType: { enum: enumOptions },
     coerce(val) {
-      if (_.isString(val) || _.isNumber(val) || _.isBoolean(val)) return val;
-      return new CoercionError('Value must be a string, number, or boolean');
+      if (_.isNumber(val) || _.isBoolean(val)) return val;
+      if (!_.isString(val)) {
+        return new CoercionError('Value must be a string, number, or boolean');
+      }
+      // Exact string member (e.g. enum(dev, prod) + "dev")
+      if (enumOptions.includes(val)) return val;
+      // process.env / overrideValues are always strings. Schema file values like
+      // LEVEL=2 are auto-coerced to numbers by the parser, but CI overrides stay
+      // as "2" / "true" and must still match numeric/boolean members.
+      for (const opt of enumOptions) {
+        if (_.isNumber(opt) && String(opt) === val) return opt;
+        if (opt === true && val === 'true') return true;
+        if (opt === false && val === 'false') return false;
+      }
+      return val;
     },
     validate(val) {
       const possibleValues: Array<any> = enumOptions || [];

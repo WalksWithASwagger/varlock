@@ -10,8 +10,12 @@ import { describe, it, expect } from 'vitest';
 import { outdent } from 'outdent';
 import { DotEnvFileDataSource, EnvGraph, CoercionError } from '../index';
 
-async function loadAndResolve(envFileContent: string) {
+async function loadAndResolve(
+  envFileContent: string,
+  opts?: { overrideValues?: Record<string, string> },
+) {
   const g = new EnvGraph();
+  if (opts?.overrideValues) g.overrideValues = opts.overrideValues;
   const testDataSource = new DotEnvFileDataSource('.env.schema', {
     overrideContents: outdent`
       # @defaultRequired=false
@@ -41,6 +45,35 @@ describe('number data type - Infinity coercion', () => {
   it('rejects string Infinity and -Infinity', () => {
     expect(() => numberType().coerce('Infinity')).toThrow(CoercionError);
     expect(() => numberType().coerce('-Infinity')).toThrow(CoercionError);
+  });
+});
+
+describe('enum data type - process.env string overrides', () => {
+  it('accepts numeric enum members from schema file values', async () => {
+    const g = await loadAndResolve(outdent`
+      # @type=enum(1, 2, 3)
+      LEVEL=2
+    `);
+    expect(g.configSchema.LEVEL.isValid).toBe(true);
+    expect(g.configSchema.LEVEL.resolvedValue).toBe(2);
+  });
+
+  it('accepts numeric enum members from string overrides', async () => {
+    const g = await loadAndResolve(outdent`
+      # @type=enum(1, 2, 3)
+      LEVEL=2
+    `, { overrideValues: { LEVEL: '1' } });
+    expect(g.configSchema.LEVEL.isValid).toBe(true);
+    expect(g.configSchema.LEVEL.resolvedValue).toBe(1);
+  });
+
+  it('accepts boolean enum members from string overrides', async () => {
+    const g = await loadAndResolve(outdent`
+      # @type=enum(true, false)
+      FLAG=false
+    `, { overrideValues: { FLAG: 'true' } });
+    expect(g.configSchema.FLAG.isValid).toBe(true);
+    expect(g.configSchema.FLAG.resolvedValue).toBe(true);
   });
 });
 
