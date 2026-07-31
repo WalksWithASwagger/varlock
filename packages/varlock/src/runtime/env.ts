@@ -40,10 +40,16 @@ function getRedactionState(): RedactionState {
 
 /** collect every redactable string within a (possibly composite) sensitive value -
  * for arrays/objects each string element registers individually, so leaking a single
- * element (not just the whole serialized value) is still caught */
+ * element (not just the whole serialized value) is still caught.
+ * Finite numbers are included (e.g. `@type=number @sensitive` PINs) because they are
+ * injected into process.env as strings and must still be scanned/redacted.
+ * Booleans are intentionally skipped: registering "true"/"false" would false-positive
+ * almost every response body. */
 function collectSensitiveStrings(value: any, collected: Array<string> = []): Array<string> {
   if (isString(value) && value) {
     collected.push(value as string);
+  } else if (typeof value === 'number' && Number.isFinite(value)) {
+    collected.push(String(value));
   } else if (Array.isArray(value)) {
     for (const el of value) collectSensitiveStrings(el, collected);
   } else if (value && typeof value === 'object') {
@@ -58,7 +64,8 @@ export function resetRedactionMap(graph: SerializedEnvGraph) {
   state.sensitiveSecretsMap = {};
   for (const itemKey in graph.config) {
     const item = graph.config[itemKey];
-    if (!item.isSensitive || !item.value) continue;
+    // Use nullish check so sensitive numeric `0` is still registered (!value would skip it)
+    if (!item.isSensitive || item.value === undefined || item.value === null) continue;
     const sensitiveStrings = collectSensitiveStrings(item.value);
     // the flat serialized form also registers (e.g. a JSON-encoded element may not
     // match its raw form once escaped)
