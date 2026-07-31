@@ -409,7 +409,8 @@ const UrlDataType = createEnvGraphDataType(
       ) {
         errors.push(new ValidationError(`Domain (${url.host}) is not in allowed list: ${settings.allowedDomains.join(',')}`));
       }
-      if (settings?.noTrailingSlash && val.endsWith('/')) {
+      // Docs + vscode exempt root pathname `/` (https://example.com/ is OK).
+      if (settings?.noTrailingSlash && url.pathname.endsWith('/') && url.pathname !== '/') {
         errors.push(new ValidationError('URL must not have a trailing slash'));
       }
       if (settings?.matches) {
