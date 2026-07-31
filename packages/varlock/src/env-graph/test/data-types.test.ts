@@ -44,6 +44,33 @@ describe('number data type - Infinity coercion', () => {
   });
 });
 
+describe('port data type', () => {
+  it('accepts integer ports', async () => {
+    const g = await loadAndResolve(outdent`
+      # @type=port
+      P=8080
+    `);
+    expect(g.configSchema.P.isValid).toBe(true);
+    expect(g.configSchema.P.resolvedValue).toBe(8080);
+  });
+
+  it('rejects non-integer numeric ports from schema auto-coerce', async () => {
+    const g = await loadAndResolve(outdent`
+      # @type=port
+      P=80.5
+    `);
+    expect(g.configSchema.P.isValid).toBe(false);
+  });
+
+  it('rejects non-integer string ports', async () => {
+    const g = await loadAndResolve(outdent`
+      # @type=port
+      P="80.5"
+    `);
+    expect(g.configSchema.P.isValid).toBe(false);
+  });
+});
+
 describe('url data type', () => {
   describe('prependHttps', () => {
     it('prepends https:// when missing', async () => {
