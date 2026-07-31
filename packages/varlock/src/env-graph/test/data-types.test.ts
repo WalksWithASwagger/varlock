@@ -189,6 +189,32 @@ describe('url data type - path values', () => {
   });
 });
 
+describe('ip data type', () => {
+  it('accepts IPv4', async () => {
+    const g = await loadAndResolve(outdent`
+      # @type=ip(version=4)
+      IP=192.168.1.1
+    `);
+    expect(g.configSchema.IP.isValid).toBe(true);
+  });
+
+  it('accepts plain IPv6', async () => {
+    const g = await loadAndResolve(outdent`
+      # @type=ip(version=6)
+      IP=2001:db8::1
+    `);
+    expect(g.configSchema.IP.isValid).toBe(true);
+  });
+
+  it('accepts IPv4-mapped IPv6 addresses', async () => {
+    const g = await loadAndResolve(outdent`
+      # @type=ip(version=6)
+      IP=::ffff:192.168.1.1
+    `);
+    expect(g.configSchema.IP.isValid).toBe(true);
+  });
+});
+
 describe('string data type - matches option', () => {
   it('accepts string matching regex literal', async () => {
     const g = await loadAndResolve(outdent`
