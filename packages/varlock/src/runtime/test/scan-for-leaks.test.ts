@@ -91,6 +91,40 @@ describe('scanForLeaks', () => {
   });
 });
 
+describe('scanForLeaks with numeric sensitive values', () => {
+  it('detects a leaked numeric secret (e.g. @type=number @sensitive)', () => {
+    resetRedactionMap({
+      config: {
+        PIN: { isSensitive: true, value: 48291736 },
+      },
+    } as unknown as SerializedEnvGraph);
+
+    expect(() => scanForLeaks('payload 48291736 end'))
+      .toThrow(/DETECTED LEAKED SENSITIVE CONFIG/);
+    expect(redactSensitiveConfig('pin=48291736')).not.toContain('48291736');
+  });
+
+  it('registers sensitive numeric zero (must not skip via falsy check)', () => {
+    resetRedactionMap({
+      config: {
+        ZERO_TOKEN: { isSensitive: true, value: 0 },
+      },
+    } as unknown as SerializedEnvGraph);
+
+    expect(() => scanForLeaks('code=0;')).toThrow(/DETECTED LEAKED SENSITIVE CONFIG/);
+  });
+
+  it('detects numeric secrets nested in arrays/objects', () => {
+    resetRedactionMap({
+      config: {
+        CREDS: { isSensitive: true, value: { pin: 991122, label: 'x' } },
+      },
+    } as unknown as SerializedEnvGraph);
+
+    expect(() => scanForLeaks('pin=991122')).toThrow(/DETECTED LEAKED SENSITIVE CONFIG/);
+  });
+});
+
 describe('scanForLeaks with per-item preventLeaks opt-out', () => {
   const LEAKY_VALUE = 'allowed-to-leave-67890';
   const NORMAL_VALUE = 'still-protected-12345';

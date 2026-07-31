@@ -135,8 +135,13 @@ export function getItemSummary(item: ConfigItem) {
   ]));
 
   let valAsStr = formattedValue(item.resolvedValue, false);
-  if (isSensitive && item.resolvedValue && _.isString(item.resolvedValue)) {
-    valAsStr = redactString(item.resolvedValue)!;
+  if (
+    isSensitive
+    && item.resolvedValue !== undefined
+    && item.resolvedValue !== null
+    && (_.isString(item.resolvedValue) || (_.isNumber(item.resolvedValue) && Number.isFinite(item.resolvedValue)))
+  ) {
+    valAsStr = redactString(String(item.resolvedValue))!;
   }
 
   // build inline indicators to append after the value
