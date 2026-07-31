@@ -189,6 +189,26 @@ describe('url data type - path values', () => {
   });
 });
 
+describe('md5 data type', () => {
+  it('accepts lowercase md5', async () => {
+    const g = await loadAndResolve(outdent`
+      # @type=md5
+      H=d41d8cd98f00b204e9800998ecf8427e
+    `);
+    expect(g.configSchema.H.isValid).toBe(true);
+    expect(g.configSchema.H.resolvedValue).toBe('d41d8cd98f00b204e9800998ecf8427e');
+  });
+
+  it('accepts uppercase md5 and normalizes to lowercase', async () => {
+    const g = await loadAndResolve(outdent`
+      # @type=md5
+      H=D41D8CD98F00B204E9800998ECF8427E
+    `);
+    expect(g.configSchema.H.isValid).toBe(true);
+    expect(g.configSchema.H.resolvedValue).toBe('d41d8cd98f00b204e9800998ecf8427e');
+  });
+});
+
 describe('string data type - matches option', () => {
   it('accepts string matching regex literal', async () => {
     const g = await loadAndResolve(outdent`

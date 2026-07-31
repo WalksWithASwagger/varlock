@@ -608,12 +608,16 @@ const UuidDataType = createEnvGraphDataType({
   },
 });
 
-const MD5_REGEX = /^[a-f0-9]{32}$/;
+const MD5_REGEX = /^[a-f0-9]{32}$/i;
 const Md5DataType = createEnvGraphDataType({
   name: 'md5',
   typeDescription: 'MD5 hash string',
   // A deterministic, unique, valid 32-hex string derived from the seed.
   generatePlaceholder: (seed) => hexFromSeed(seed).slice(0, 32),
+  coerce(rawVal) {
+    // Accept uppercase hex (common from tools) and normalize like typical hash handling
+    return coerceToString(rawVal).toLowerCase();
+  },
   validate(val) {
     const result = MD5_REGEX.test(val);
     if (result) return true;
