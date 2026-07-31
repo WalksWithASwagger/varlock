@@ -545,9 +545,18 @@ const PortDataType = createEnvGraphDataType(
         if (rawVal.includes('.')) throw new CoercionError('Port number must be an integer');
         if (rawVal.includes('e')) throw new CoercionError('Port number should be an integer, not in exponential notation');
       }
-      return coerceToNumber(rawVal);
+      const numVal = coerceToNumber(rawVal);
+      // Unquoted schema values like 80.5 are already numbers after parse auto-coerce;
+      // the string '.' check above does not cover that path.
+      if (!Number.isInteger(numVal)) {
+        throw new CoercionError('Port number must be an integer');
+      }
+      return numVal;
     },
     validate(val) {
+      if (!Number.isInteger(val)) {
+        return new ValidationError('Port number must be an integer');
+      }
       if (settings?.min !== undefined && val < settings?.min) {
         return new ValidationError(`Min value is ${settings?.min}`);
       }
