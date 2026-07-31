@@ -2,10 +2,11 @@
 # Verify this VM can open PRs from WalksWithASwagger/* to dmno-dev/varlock.
 set -euo pipefail
 
-prefix="${GH_TOKEN:0:4}"
+token="${GH_TOKEN:-}"
+prefix="${token:0:4}"
 echo "GH_TOKEN prefix: ${prefix:-<unset>}"
 
-if [[ -z "${GH_TOKEN:-}" ]]; then
+if [[ -z "$token" ]]; then
   echo "FAIL: GH_TOKEN is not set."
   echo "Add a WalksWithASwagger PAT as secret GH_TOKEN in Cursor Cloud Agents → Secrets,"
   echo "then start a new agent so the secret is injected."
