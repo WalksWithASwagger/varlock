@@ -13,6 +13,12 @@
 
 
 
+
+## 0.4.1
+<sub>2026-09-03</sub>
+
+- [#17](https://github.com/WalksWithASwagger/varlock/pull/17)  *(patch)* Thanks [@WalksWithASwagger](https://github.com/WalksWithASwagger)! - Fix enum/url/ip/md5/port coercion, imported @currentEnv ([#428](https://github.com/WalksWithASwagger/varlock/issues/428)), and ServerResponse.end hang ([#897](https://github.com/WalksWithASwagger/varlock/issues/897))
+
 ## 0.4.0
 <sub>2026-09-01</sub>
 
