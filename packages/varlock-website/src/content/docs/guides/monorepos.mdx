@@ -55,7 +55,7 @@ Imports must flow in one direction. If `web` imports `api` and `api` also import
 :::
 
 :::note[Shared environment flag]
-If several projects share an environment flag like `APP_ENV`, define it in the shared schema and import it. For per-service environment variations, see [Loading environment-specific `.env` files](/guides/environments#loading-environment-specific-env-files).
+If several projects share an environment flag like `APP_ENV`, define it in the shared schema and import it. A package can then set `# @currentEnv=$APP_ENV` and `pick` that key; the flag does not have to be redefined in the package schema. For per-service environment variations, see [Loading environment-specific `.env` files](/guides/environments#loading-environment-specific-env-files).
 :::
 
 ### Pointing varlock at the right directory
